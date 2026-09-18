@@ -56,7 +56,7 @@ selected_movie = st.sidebar.selectbox(
 filtered_data = data[data["영화명"] == selected_movie]
 
 
-# [4. 구역 1: 일자별 관객수 (선 그래프)]
+# [4. 구역 1: 개별 영화 일자별 관객수 (선 그래프)]
 st.header(f"📌 '{selected_movie}' 일별 관객수 추이")
 
 fig1 = px.line(
@@ -67,10 +67,8 @@ fig1 = px.line(
     markers=True,  # 데이터 지점에 점 표시
 )
 
-# 그래프 화면 출력
 st.plotly_chart(fig1, use_container_width=True)
 
-# 그래프 1 설명 문구
 st.info(
     f"💡 **이 그래프로 알 수 있는 것:** '{selected_movie}'의 개봉 후 일자별 관객수 증감 추이 및 흥행 피크 시점을 확인할 수 있습니다."
 )
@@ -78,10 +76,9 @@ st.info(
 st.markdown("---")  # 구분선
 
 
-# [5. 구역 2: 누적관객수 추이 (영역 차트)]
+# [5. 구역 2: 개별 영화 누적관객수 추이 (영역 차트)]
 st.header(f"📌 '{selected_movie}' 누적 관객수 추이")
 
-# px.area()를 사용하여 기준일자별 누적관객수를 영역차트로 그려줍니다.
 fig2 = px.area(
     filtered_data,
     x="기준일자",
@@ -90,10 +87,36 @@ fig2 = px.area(
     markers=True,
 )
 
-# 그래프 화면 출력
 st.plotly_chart(fig2, use_container_width=True)
 
-# 그래프 2 설명 문구
 st.info(
     f"💡 **이 그래프로 알 수 있는 것:** 시간 경과에 따라 '{selected_movie}'의 전체 누적 관객수가 어떤 속도로 증가했는지(상승 완만도/급증 구간) 한눈에 파악할 수 있습니다."
+)
+
+st.markdown("---")  # 구분선
+
+
+# [6. 구역 3: 상위 5개 영화 누적관객수 비교 (다중 선 그래프)]
+st.header("📌 TOP 5 영화 누적 관객수 비교")
+
+# 누적관객수 상위 5개 영화 선택
+top5_movies = movie_order[:5]
+
+# 상위 5개 영화의 데이터만 필터링
+top5_data = data[data["영화명"].isin(top5_movies)]
+
+# color="영화명"을 지정하여 영화별로 다른 색상 및 범례(Legend)가 자동으로 생성되도록 설정
+fig3 = px.line(
+    top5_data,
+    x="기준일자",
+    y="누적관객수",
+    color="영화명",  # 영화별 색상 및 범례 분리
+    title="상위 5개 영화의 일자별 누적 관객수 비교",
+    markers=True,
+)
+
+st.plotly_chart(fig3, use_container_width=True)
+
+st.info(
+    f"💡 **이 그래프로 알 수 있는 것:** 흥행 상위 5개 영화({', '.join(top5_movies)})의 누적 관객수 증가 곡선을 직접 비교하여, 각 영화의 흥행 속도와 최종 관객수 차이를 직관적으로 비교할 수 있습니다."
 )
