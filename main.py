@@ -120,7 +120,7 @@ top5_long_movies = (
 # 상위 5개 영화의 전체 데이터 추출
 top5_data = data[data["영화명"].isin(top5_long_movies)]
 
-# 다중 선 그래프 작성 (color="영화명"으로 자동 범례 및 색상 적용)
+# 다중 선 그래프 작성
 fig3 = px.line(
     top5_data,
     x="기준일자",
@@ -142,20 +142,19 @@ st.markdown("---")  # 구분선
 # [7. 구역 4: 전체 박스오피스 관객수 및 7일 이동평균 (선 그래프)]
 st.header("📌 전체 박스오피스 일별 총관객수 & 7일 이동평균 추이")
 
-# 1) 기준일자별 TOP10 영화의 해당일관객수 총합 계산
+# 기준일자별 TOP10 영화의 해당일관객수 총합 계산
 daily_total = (
     data.groupby("기준일자")["해당일관객수"].sum().reset_index()
 )
 
-# 2) 7일 이동평균(Moving Average) 계산
+# 7일 이동평균(Moving Average) 계산
 daily_total["7일_이동평균"] = (
     daily_total["해당일관객수"].rolling(window=7).mean()
 )
 
-# 3) Plotly graph_objects를 활용하여 두 개의 선을 하나의 그래프에 겹쳐 그리기
 fig4 = go.Figure()
 
-# 일별 총관객수 (원본 데이터: 연한 색상, 얇은 선)
+# 일별 총관객수 (연한 색상)
 fig4.add_trace(
     go.Scatter(
         x=daily_total["기준일자"],
@@ -166,7 +165,7 @@ fig4.add_trace(
     )
 )
 
-# 7일 이동평균선 (진하고 두꺼운 선)
+# 7일 이동평균선 (진한 빨간색)
 fig4.add_trace(
     go.Scatter(
         x=daily_total["기준일자"],
@@ -177,7 +176,6 @@ fig4.add_trace(
     )
 )
 
-# 레이아웃 설정
 fig4.update_layout(
     title="전체 박스오피스 관객수 추이 및 7일 이동평균선",
     xaxis_title="기준일자",
@@ -189,4 +187,40 @@ st.plotly_chart(fig4, use_container_width=True)
 
 st.info(
     "💡 **이 그래프로 알 수 있는 것:** 요일별 관객수 변동(주말 급증, 평일 감소) 노이즈를 7일 이동평균선으로 완화하여 전체 영화 시장의 중장기적인 성수기/비수기 흐름과 흥행 트렌드를 파악할 수 있습니다."
+)
+
+st.markdown("---")  # 구분선
+
+
+# [8. 구역 5: 전체 박스오피스 월별 총관객수 (막대 그래프)]
+st.header("📌 전체 박스오피스 월별 총관객수")
+
+# 1) '기준일자'에서 월(연-월, YYYY-MM) 정보 추출
+daily_total["연월"] = daily_total["기준일자"].dt.to_period("M").astype(str)
+
+# 2) 월(연월) 단위로 해당일관객수 합산
+monthly_total = (
+    daily_total.groupby("연월")["해당일관객수"].sum().reset_index()
+)
+
+# 3) 월별 막대 그래프(Bar Chart) 작성
+fig5 = px.bar(
+    monthly_total,
+    x="연월",
+    y="해당일관객수",
+    title="월별 박스오피스 관객수 합계",
+    text_auto=".2s",  # 막대 위에 축약된 숫자로 관객수 표시 (예: 1.2M)
+    labels={"연월": "월", "해당일관객수": "월간 총관객수"},
+)
+
+# 막대 그래프 디자인 개선
+fig5.update_traces(
+    marker_color="#4F8BF9", textposition="outside"
+)  # 막대 색상 지정 및 숫자 위치 지정
+fig5.update_layout(xaxis_type="category")  # x축을 범주형으로 지정하여 정렬 유지
+
+st.plotly_chart(fig5, use_container_width=True)
+
+st.info(
+    "💡 **이 그래프로 알 수 있는 것:** 월별 박스오피스 총 관객수 규모를 비교하여 영화 시장의 연중 최고 성수기 월과 비수기 월을 한눈에 식별할 수 있습니다."
 )
