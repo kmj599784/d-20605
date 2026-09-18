@@ -1,118 +1,88 @@
-import streamlit as st
 import pandas as pd
 import plotly.express as px
+import streamlit as st
 
-# 페이지 기본 설정
+# 페이지 기본 설정 (타이틀, 레이아웃)
 st.set_page_config(
-    page_title="영화 데이터 그래프 도감 2 - 분포와 관계",
-    layout="wide"
+    page_title="영화 박스오피스 분석", page_icon="🎬", layout="wide"
 )
 
-# 제목 설정
-st.title("영화 데이터 그래프 도감 2 - 분포와 관계")
+# App 제목
+st.title("🎬 영화 박스오피스 데이터 분석 App")
 
-# 데이터 불러오기 및 전처리
+
+# [1. 데이터 불러오기]
+# @st.cache_data decorator를 사용하여 데이터가 캐시에 저장되도록 합니다.
+# 이렇게 하면 앱이 다시 실행될 때 파일 전달을 위해 매번 다운로드하지 않고 저장된 데이터를 재사용합니다.
 @st.cache_data
 def load_data():
-    url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
+    url = "https://raw.githubusercontent.com/keep-growing-park/data-science/refs/heads/main/dataset/kobis_1year_boxoffice.csv"
     df = pd.read_csv(url)
-    
-    # genre 열 전처리: '|' 기호로 연결된 여러 장르 중 첫 번째 장르만 추출
-    df['genre'] = df['genre'].astype(str).apply(lambda x: x.split('|')[0] if x != 'nan' else x)
-    
+
+    # [2. 날짜 전처리]
+    # 결측치(값이 없는 데이터)가 있는 행을 제거합니다.
+    df = df.dropna()
+
+    # '기준일자' 컬럼을 datetime(날짜) 형식으로 변환합니다.
+    df["기준일자"] = pd.to_datetime(df["기준일자"])
+
+    # 전체 데이터를 기준일자 오름차순으로 정렬합니다.
+    df = df.sort_values(by="기준일자", ascending=True)
+
     return df
 
-df = load_data()
 
-# ---------------------------------------------------------
-# 1. 장르별 영화 편수 (도넛 그래프)
-# ---------------------------------------------------------
-st.subheader("1. 장르별 영화 편수")
+# 데이터 로드 실행
+data = load_data()
 
-# 장르별 편수 집계
-genre_counts = df['genre'].value_counts().reset_index()
-genre_counts.columns = ['genre', 'count']
 
-# Plotly 도넛 그래프 생성
-fig_genre = px.pie(
-    genre_counts,
-    values='count',
-    names='genre',
-    hole=0.4,
-    title="장르별 영화 편수 분포"
+# [3. 영화 선택 기능]
+# 누적관객수가 가장 높은 순서대로 중복 없이 영화 이름을 추출합니다.
+# 영화별 최대 누적관객수를 구해 내림차순 정렬
+movie_order = (
+    data.groupby("영화명")["누적관객수"]
+    .max()
+    .sort_values(ascending=False)
+    .index.tolist()
 )
 
-# 호버 툴팁 설정 (편수 및 비율 표시)
-fig_genre.update_traces(
-    hovertemplate="<b>장르:</b> %{label}<br><b>편수:</b> %{value}편<br><b>비율:</b> %{percent}"
+# 사이드바에서 분석할 영화를 선택할 수 있게 만듭니다.
+st.sidebar.header("🔍 설정")
+selected_movie = st.sidebar.selectbox(
+    "분석할 영화를 선택하세요:", options=movie_order
 )
 
-# 그래프 출력
-st.plotly_chart(fig_genre, use_container_width=True)
+# 사용자가 선택한 영화의 데이터만 필터링합니다.
+filtered_data = data[data["영화명"] == selected_movie]
 
-# 구분선 및 알 수 있는 점 안내 구역
-st.divider()
-st.markdown("**이 그래프로 알 수 있는 것:** 특정 기간 박스오피스 상위권에 가장 많이 진입한 주요 장르의 비중과 분포를 한눈에 확인할 수 있습니다.")
 
-st.markdown("<br><br>", unsafe_allow_html=True)
+# [5. 구역 나누기]
+# 구역 1: 기본 추이 분석 (선 그래프)
+st.header(f"📌 '{selected_movie}' 관객수 추이")
 
-# ---------------------------------------------------------
-# 2. 장르 및 영화별 총 관객수 (트리맵)
-# ---------------------------------------------------------
-st.subheader("2. 장르 및 영화별 총 관객수 분포")
-
-# Plotly 트리맵 생성 (계층 구조: genre -> movieNm, 칸 크기: total_audi)
-fig_treemap = px.treemap(
-    df,
-    path=[px.Constant("전체"), 'genre', 'movieNm'],
-    values='total_audi',
-    title="장르별·영화별 총 관객수 (트리맵)",
-    hover_data={'total_audi': ':,d'}
+# [4. 선그래프 그리기]
+# 선택된 영화의 '기준일자'별 '해당일관객수' 변화를 Plotly 선그래프로 생성합니다.
+fig1 = px.line(
+    filtered_data,
+    x="기준일자",
+    y="해당일관객수",
+    title=f"일자별 관객수 변화 그래프",
+    markers=True,  # 데이터 지점에 점 표시
 )
 
-# 호버 툴팁 설정 (영화명과 총 관객수 표시)
-fig_treemap.update_traces(
-    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,}명<extra></extra>"
+# 그래프 화면에 출력
+st.plotly_chart(fig1, use_container_width=True)
+
+# 그래프 하단 분석 결과 안내 문구 자리
+st.info(
+    f"💡 **이 그래프로 알 수 있는 것:** '{selected_movie}'의 개봉 후 일자별 관객수 증감 추이 및 흥행 피크 시점을 확인할 수 있습니다."
 )
 
-# 그래프 출력
-st.plotly_chart(fig_treemap, use_container_width=True)
+st.markdown("---")  # 구분선
 
-# 구분선 및 알 수 있는 점 안내 구역
-st.divider()
-st.markdown("**이 그래프로 알 수 있는 것:** 장르별 전체 관객수 규모와 함께 각 장르 내에서 어떤 영화가 흥행을 주도했는지 상대적 크기로 한눈에 비교할 수 있습니다.")
+# [5. 추가 그래프를 위한 구역 (예시 구역)]
+st.header("📌 추가 분석 구역 (추후 업데이트 예정)")
+st.caption("여기에 새로운 차트나 분석 항목을 계속 추가할 수 있습니다.")
 
-st.markdown("<br><br>", unsafe_allow_html=True)
-
-# ---------------------------------------------------------
-# 3. 총 관객수 분포 (히스토그램)
-# ---------------------------------------------------------
-st.subheader("3. 총 관객수 분포")
-
-# Plotly 히스토그램 생성
-fig_hist = px.histogram(
-    df,
-    x='total_audi',
-    nbins=20,
-    title="총 관객수 히스토그램",
-    labels={'total_audi': '총 관객수', 'count': '영화 수'}
-)
-
-fig_hist.update_traces(
-    hovertemplate="<b>관객수 구간:</b> %{x}<br><b>영화 수:</b> %{y}편<extra></extra>"
-)
-
-# 그래프 출력
-st.plotly_chart(fig_hist, use_container_width=True)
-
-# 최다 관객 영화 정보 데이터 동적 추출
-top_movie = df.loc[df['total_audi'].idxmax()]
-top_movie_name = top_movie['movieNm']
-top_movie_audi = top_movie['total_audi']
-
-# 구분선 및 알 수 있는 점 안내 구역
-st.divider()
-st.markdown(
-    f"**이 그래프로 알 수 있는 것:** 대부분의 영화가 **하위 관객수 구간(200만 명 미만)**에 모여 있는 오른쪽으로 긴 꼬리를 찌그러진 분포를 보입니다. "
-    f"반면 가장 관객 수가 많은 영화는 **'{top_movie_name}'**(총 {top_movie_audi:,}명)으로 흥행 대작과 일반 영화 간의 양극화 현상을 확인할 수 있습니다."
-)
+# 예시: 추가 그래프용 하단 안내문구 자리
+st.info("💡 **이 그래프로 알 수 있는 것:** (추가 예정인 그래프의 분석 요약)")
