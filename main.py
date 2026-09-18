@@ -38,7 +38,6 @@ data = load_data()
 
 # [3. 영화 선택 기능]
 # 누적관객수가 가장 높은 순서대로 중복 없이 영화 이름을 추출합니다.
-# 영화별 최대 누적관객수를 구해 내림차순 정렬
 movie_order = (
     data.groupby("영화명")["누적관객수"]
     .max()
@@ -63,7 +62,7 @@ fig1 = px.line(
     filtered_data,
     x="기준일자",
     y="해당일관객수",
-    title=f"일자별 관객수 변화",
+    title="일자별 관객수 변화",
     markers=True,  # 데이터 지점에 점 표시
 )
 
@@ -83,7 +82,7 @@ fig2 = px.area(
     filtered_data,
     x="기준일자",
     y="누적관객수",
-    title=f"일자별 누적 관객수 증가 추이",
+    title="일자별 누적 관객수 증가 추이",
     markers=True,
 )
 
@@ -96,27 +95,42 @@ st.info(
 st.markdown("---")  # 구분선
 
 
-# [6. 구역 3: 상위 5개 영화 누적관객수 비교 (다중 선 그래프)]
-st.header("📌 TOP 5 영화 누적 관객수 비교")
+# [6. 구역 3: 조건을 만족하는 상위 5개 영화 누적관객수 비교 (다중 선 그래프)]
+st.header("📌 장기 흥행 TOP 5 영화 누적 관객수 비교")
 
-# 누적관객수 상위 5개 영화 선택
-top5_movies = movie_order[:5]
+# 1) 영화별 TOP10 차트 등재 일수(데이터 행 수) 집계
+movie_counts = data.groupby("영화명").size()
 
-# 상위 5개 영화의 데이터만 필터링
-top5_data = data[data["영화명"].isin(top5_movies)]
+# 2) 20일 이상 등장한 영화들의 이름만 추출
+long_running_movies = movie_counts[movie_counts >= 20].index
 
-# color="영화명"을 지정하여 영화별로 다른 색상 및 범례(Legend)가 자동으로 생성되도록 설정
+# 3) 20일 이상 등장한 영화 데이터만 1차 필터링
+filtered_long_data = data[data["영화명"].isin(long_running_movies)]
+
+# 4) 조건에 맞는 영화 중 누적관객수 상위 5개 영화 선정
+top5_long_movies = (
+    filtered_long_data.groupby("영화명")["누적관객수"]
+    .max()
+    .sort_values(ascending=False)
+    .head(5)
+    .index.tolist()
+)
+
+# 5) 상위 5개 영화의 전체 데이터 추출
+top5_data = data[data["영화명"].isin(top5_long_movies)]
+
+# 6) 다중 선 그래프 작성 (color="영화명"으로 자동 범례 및 색상 적용)
 fig3 = px.line(
     top5_data,
     x="기준일자",
     y="누적관객수",
     color="영화명",  # 영화별 색상 및 범례 분리
-    title="상위 5개 영화의 일자별 누적 관객수 비교",
+    title="TOP10 20일 이상 진입 영화 중 누적 관객수 상위 5개 비교",
     markers=True,
 )
 
 st.plotly_chart(fig3, use_container_width=True)
 
 st.info(
-    f"💡 **이 그래프로 알 수 있는 것:** 흥행 상위 5개 영화({', '.join(top5_movies)})의 누적 관객수 증가 곡선을 직접 비교하여, 각 영화의 흥행 속도와 최종 관객수 차이를 직관적으로 비교할 수 있습니다."
+    f"💡 **이 그래프로 알 수 있는 것:** TOP10 차트에 20일 이상 유지된 장기 흥행작 중 상위 5개 영화({', '.join(top5_long_movies)})의 일자별 누적 관객수 성장세를 비교하여, 장기 흥행 영화들의 관객 동원력 차이를 확인할 수 있습니다."
 )
