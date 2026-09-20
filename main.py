@@ -2,297 +2,41 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-#st.set_page_config(
-    page_title="영화 데이터 그래프 도감 2 - 분포와 관계",
-    page_icon="🎬",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="영화 데이터 그래프 도감 2 - 분포와 관계", layout="wide")
+st.title("영화 데이터 그래프 도감 2 - 분포와 관계")
 
-# Custom CSS for UI styling and insight boxes
-st.markdown("""
-<style>
-    .main-title {
-        font-size: 2.1rem;
-        font-weight: 800;
-        color: #0F172A;
-        margin-bottom: 0.2rem;
-    }
-    .sub-title {
-        font-size: 1rem;
-        color: #475569;
-        margin-bottom: 1.5rem;
-    }
-    .insight-box {
-        background-color: #F8FAFC;
-        border-left: 4px solid #3B82F6;
-        padding: 1rem 1.25rem;
-        border-radius: 0.5rem;
-        margin-top: 0.75rem;
-        margin-bottom: 1.75rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .insight-header {
-        font-weight: 700;
-        color: #1E40AF;
-        font-size: 0.95rem;
-        margin-bottom: 0.3rem;
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-    }
-    .insight-text {
-        color: #334155;
-        font-size: 0.95rem;
-        line-height: 1.55;
-        margin: 0;
-    }
-    .metric-card {
-        background: white;
-        border: 1px solid #E2E8F0;
-        border-radius: 0.75rem;
-        padding: 1rem;
-        text-align: center;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-    }
-</style>
-""", unsafe_allow_html=True)
+DATA_URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
 
-#DATA_URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
 
 @st.cache_data
 def load_data():
-    try:
-        df = pd.read_csv(DATA_URL)
-        
-        # 1. 장르 전처리: '|' 구분시 첫 번째 장르만 추출
-        df['genre_clean'] = df['genre'].astype(str).apply(
-            lambda x: x.split('|')[0].strip() if pd.notnull(x) and x != 'nan' else '기타'
-        )
-        
-        # 2. 수치형 컬럼 변환
-        numeric_cols = ['first_scrn', 'first_show', 'first_week_audi', 'total_audi', 'days_in_top10']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-                
-        # 3. 개봉일 날짜형 변환
-        if 'openDt' in df.columns:
-            df['openDt_str'] = df['openDt'].astype(str).str.replace('.0', '', regex=False)
-            df['openDt_parsed'] = pd.to_datetime(df['openDt_str'], format='%Y%m%d', errors='coerce')
-            
-        return df
-    except Exception as e:
-        st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
-        return pd.DataFrame()
+    # 1년간 박스오피스 10위권에 든 영화 216편의 요약표를 불러옵니다
+    df = pd.read_csv(DATA_URL)
+    # 장르가 세로막대 기호(|)로 여러 개 적힌 영화는 첫 번째 장르만 씁니다
+    df["장르"] = df["genre"].str.split("|").str[0]
+    return df
+
 
 df = load_data()
 
-#st.markdown('<div class="main-title">🎬 영화 데이터 그래프 도감 2</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">영화 흥행 데이터의 분포와 관계 분석 (KOBIS 216편 데이터)</div>', unsafe_allow_html=True)
+# ── 그래프 1. 장르별 영화 편수 도넛 ──
+st.header("1. 장르별 영화 편수 (도넛)")
+genre_count = df["장르"].value_counts().reset_index()
+genre_count.columns = ["장르", "편수"]
 
-if df.empty:
-    st.stop()
-
-# Helper function for rendering insight box
-def render_insight(text):
-    st.markdown(f"""
-    <div class="insight-box">
-        <div class="insight-header">💡 이 그래프로 알 수 있는 것</div>
-        <p class="insight-text">{text}</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Sidebar controls
-with st.sidebar:
-    st.header("⚙️ 앱 정보 및 설정")
-    st.info("💡 KOBIS 박스오피스 상위 216편 데이터 기반의 분포 및 상관관계 탐색 앱입니다.")
-    
-    st.divider()
-    st.markdown("### 📊 데이터 요약")
-    st.metric("총 분석 영화 수", f"{len(df):,} 편")
-    st.metric("총 관객 수 합계", f"{int(df['total_audi'].sum()):,} 명")
-    st.metric("평균 10위권 체류일", f"{df['days_in_top10'].mean():.1f} 일")
-    
-    st.divider()
-    st.markdown("### 📦 필요 라이브러리 (requirements.txt)")
-    st.code("streamlit\npandas\nplotly", language="text")
-
-# Key Metrics Overview
-top_movie = df.loc[df['total_audi'].idxmax()] if not df.empty else None
-top_genre = df['genre_clean'].mode()[0] if not df.empty else "N/A"
-
-col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-with col_m1:
-    st.markdown('<div class="metric-card"><b>총 분석 영화 편수</b><h3>216 편</h3></div>', unsafe_allow_html=True)
-with col_m2:
-    st.markdown(f'<div class="metric-card"><b>최다 영화 장르</b><h3>{top_genre}</h3></div>', unsafe_allow_html=True)
-with col_m3:
-    st.markdown(f'<div class="metric-card"><b>최다 관객 수 영화</b><h3>{top_movie["movieNm"] if top_movie is not None else "-"}</h3></div>', unsafe_allow_html=True)
-with col_m4:
-    st.markdown('<div class="metric-card"><b>평균 총 관객 수</b><h3>' + f"{int(df['total_audi'].mean()):,} 명" + '</h3></div>', unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-#st.subheader("1. 장르별 영화 편수 비율 (도넛 그래프)")
-
-genre_counts = df['genre_clean'].value_counts().reset_index()
-genre_counts.columns = ['장르', '편수']
-
-fig_donut = px.pie(
-    genre_counts,
-    names='장르',
-    values='편수',
-    hole=0.45,
-    color_discrete_sequence=px.colors.qualitative.Pastel
+fig = px.pie(
+    genre_count,
+    names="장르",
+    values="편수",
+    hole=0.45,  # 가운데 구멍을 뚫어 도넛 모양으로
 )
+# 조각에 마우스를 올리면 편수와 비율이 보이게 합니다
+fig.update_traces(hovertemplate="%{label}<br>%{value}편 (%{percent})<extra></extra>")
+st.plotly_chart(fig, width="stretch")
 
-fig_donut.update_traces(
-    textposition='inside',
-    textinfo='percent+label',
-    hovertemplate="<b>장르: %{label}</b><br>편수: %{value}편<br>비율: %{percent}<extra></extra>"
-)
-
-fig_donut.update_layout(
-    margin=dict(t=20, b=20, l=20, r=20),
-    legend_title_text="장르",
-    height=420
-)
-
-st.plotly_chart(fig_donut, use_container_width=True)
-
-render_insight(
-    "상위 박스오피스 영화 중 <b>드라마, 액션, 애니메이션</b> 장르가 절반 이상을 차지하며, 주요 흥행작들이 특정 인기 장르에 집중되는 경향을 확인할 수 있습니다."
-)
+# '이 그래프로 알 수 있는 것' 한 문장을 적는 자리
+st.text_input("이 그래프로 알 수 있는 것", key="note1")
 
 st.divider()
-
-#st.subheader("2. 장르 및 영화별 총 관객 수 (트리맵)")
-
-# Ensure numeric and valid representation for treemap values
-df_treemap = df.copy()
-df_treemap['total_audi_valid'] = df_treemap['total_audi'].apply(lambda x: max(x, 1))
-
-fig_treemap = px.treemap(
-    df_treemap,
-    path=['genre_clean', 'movieNm'],
-    values='total_audi_valid',
-    color='genre_clean',
-    color_discrete_sequence=px.colors.qualitative.Set3,
-    custom_data=['movieNm', 'total_audi', 'genre_clean']
-)
-
-fig_treemap.update_traces(
-    hovertemplate="<b>영화명:</b> %{customdata[0]}<br><b>장르:</b> %{customdata[2]}<br><b>총 관객 수:</b> %{customdata[1]:,}명<extra></extra>",
-    marker=dict(pad=dict(t=25, l=3, r=3, b=3))
-)
-
-fig_treemap.update_layout(
-    margin=dict(t=30, b=20, l=10, r=10),
-    height=550
-)
-
-st.plotly_chart(fig_treemap, use_container_width=True)
-
-render_insight(
-    "트리맵 사각형의 면적을 통해 각 장르 내부에서 어떤 영화가 독보적인 관객 수(total_audi)를 확보했는지 한눈에 파악할 수 있습니다."
-)
-
-st.divider()
-
-#st.subheader("3. 개봉 첫 주 관객 수와 총 관객 수의 관계 (산점도)")
-
-fig_scatter = px.scatter(
-    df,
-    x='first_week_audi',
-    y='total_audi',
-    color='genre_clean',
-    size='days_in_top10',
-    hover_name='movieNm',
-    hover_data={'first_week_audi': ':,', 'total_audi': ':,', 'days_in_top10': True, 'genre_clean': False},
-    labels={
-        'first_week_audi': '개봉 첫 주 관객 수 (명)',
-        'total_audi': '총 관객 수 (명)',
-        'genre_clean': '주요 장르',
-        'days_in_top10': '10위권 유지일'
-    },
-    color_discrete_sequence=px.colors.qualitative.Set2
-)
-
-fig_scatter.update_layout(
-    margin=dict(t=20, b=20, l=20, r=20),
-    height=480
-)
-
-st.plotly_chart(fig_scatter, use_container_width=True)
-
-render_insight(
-    "개봉 첫 주 관객 수와 최종 총 관객 수 사이에는 매우 강한 양의 상관관계가 있으며, 초기 흥행 여부가 최종 영화 성공을 좌우한다는 것을 알 수 있습니다."
-)
-
-st.divider()
-
-#st.subheader("4. 주요 장르별 총 관객 수 분포 (박스플롯)")
-
-top_genres = genre_counts.head(6)['장르'].tolist()
-df_top_genres = df[df['genre_clean'].isin(top_genres)]
-
-fig_box = px.box(
-    df_top_genres,
-    x='genre_clean',
-    y='total_audi',
-    color='genre_clean',
-    points='all',
-    hover_name='movieNm',
-    labels={'genre_clean': '장르', 'total_audi': '총 관객 수 (명)'},
-    color_discrete_sequence=px.colors.qualitative.Safe
-)
-
-fig_box.update_layout(
-    showlegend=False,
-    margin=dict(t=20, b=20, l=20, r=20),
-    height=450
-)
-
-st.plotly_chart(fig_box, use_container_width=True)
-
-render_insight(
-    "대부분의 장르는 관객 수 분포가 하단에 집중되어 있으나, 액션 및 드라마 장르 등에서는 천만 이상 관객을 기록한 메가 히트작(이상치)이 눈에 띕니다."
-)
-
-st.divider()
-
-#st.subheader("5. Top 10 체류 날수(days_in_top10) 분포")
-
-fig_hist = px.histogram(
-    df,
-    x='days_in_top10',
-    nbins=20,
-    color_discrete_sequence=['#6366F1'],
-    labels={'days_in_top10': 'Top 10 유지 날수', 'count': '영화 수'},
-    text_auto=True
-)
-
-fig_hist.update_layout(
-    xaxis_title="TOP 10 머문 날수 (일)",
-    yaxis_title="영화 수 (편)",
-    bargap=0.1,
-    margin=dict(t=20, b=20, l=20, r=20),
-    height=400
-)
-
-st.plotly_chart(fig_hist, use_container_width=True)
-
-render_insight(
-    "대부분의 영화는 10~30일 이내에 TOP 10 박스오피스 순위권에서 벗어나며, 50일 이상 장기 유지하는 영화는 극히 일부에 불과합니다."
-)
-
-st.divider()
-
-# Data preview expander
-with st.expander("📄 원본 데이터 전체 보기"):
-    st.dataframe(
-        df[['movieCd', 'movieNm', 'genre_clean', 'nation', 'openDt_str', 'first_scrn', 'first_week_audi', 'total_audi', 'days_in_top10']],
-        use_container_width=True,
-        hide_index=True
-    )
+# 앞으로 그래프를 계속 추가할 구역
+st.header("2. (다음 그래프를 여기에 추가)")
