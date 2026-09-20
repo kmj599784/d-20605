@@ -141,6 +141,42 @@ try:
 
     st.divider()
 
+    st.header("5. 주요 장르별 총 관객수 분포 (박스 플롯)")
+    
+    # 영화가 10편 이상인 장르 추출
+    genre_counts_series = filtered_df['genre_clean'].value_counts()
+    major_genres = genre_counts_series[genre_counts_series >= 10].index.tolist()
+    
+    df_major_genres = filtered_df[filtered_df['genre_clean'].isin(major_genres)]
+    
+    if len(df_major_genres) > 0:
+        fig_box_audi = px.box(
+            df_major_genres,
+            x='genre_clean',
+            y='total_audi',
+            color='genre_clean',
+            hover_name='movieNm',
+            points="outliers",  # 이상치(outlier) 점 표출
+            title="주요 장르(10편 이상)별 총 관객수 분포 및 흥행 이상치(Outlier)",
+            labels={
+                'genre_clean': '장르',
+                'total_audi': '총 관객수'
+            },
+            hover_data={
+                'genre_clean': True,
+                'total_audi': ':,.0f'
+            },
+            color_discrete_sequence=px.colors.qualitative.Dark24
+        )
+        fig_box_audi.update_layout(showlegend=False, margin=dict(t=50, l=20, r=20, b=20))
+        
+        st.plotly_chart(fig_box_audi, use_container_width=True)
+        st.info("💡 **이 그래프로 알 수 있는 것:** 데이터 수가 충분한 주요 장르(10편 이상) 내에서 평균적인 흥행 규모(중앙값)와 함께, 통계적 상범주를 벗어나 대풍년을 기록한 '초대형 흥행 영화(아웃라이어)'들을 한눈에 식별할 수 있습니다.")
+    else:
+        st.warning("선택한 필터 조건 내에 10편 이상의 영화를 가진 장르가 없습니다.")
+
+    st.divider()
+
     with st.expander("📄 원본 데이터 일부 보기"):
         st.dataframe(filtered_df[['movieNm', 'genre_clean', 'openDt', 'first_scrn', 'first_show', 'first_week_audi', 'total_audi', 'days_in_top10']])
 
