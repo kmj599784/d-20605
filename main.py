@@ -10,7 +10,7 @@ st.set_page_config(
 
 st.title("🎬 영화 데이터 그래프 도감 2 - 분포와 관계")
 st.markdown("""
-박스오피스 상위권 영화 데이터를 바탕으로 **장르별 분포**, **총 관객수 비중 및 관계**, **개봉일 스크린수와 관객수의 상관관계**를 시각화 차트로 살펴보는 도감입니다.
+박스오피스 상위권 영화 데이터를 바탕으로 **장르별 분포**, **총 관객수 비중 및 관계**, **개봉일 스크린수, 첫 주 관객수와 최종 관객수의 상관관계**를 살펴보는 시각화 도감입니다.
 """)
 
 st.divider()
@@ -23,7 +23,7 @@ def load_data():
     # genre 열 처리: 세로막대 '|' 기호로 연결되어 있는 경우 첫 번째 장르만 사용
     df['genre_clean'] = df['genre'].fillna('기타').astype(str).apply(lambda x: x.split('|')[0].strip())
     
-    # openDt 날짜형으로 변환 (YYYYMMDD 포맷)
+    # openDt 날짜형 변환
     df['openDt_parsed'] = pd.to_datetime(df['openDt'].astype(str), format='%Y%m%d', errors='coerce')
     
     return df
@@ -38,9 +38,22 @@ try:
         default=sorted(df['genre_clean'].unique())
     )
     
-    filtered_df = df[df['genre_clean'].isin(selected_genres)]
+    filtered_df = df[df['genre_clean'].isin(selected_genres)].copy()
     
     st.sidebar.markdown(f"**총 데이터 수:** `{len(filtered_df)}` / {len(df)} 편")
+
+    # 상단 요약 지표
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("총 분석 영화 수", f"{len(filtered_df):,} 편")
+    with col2:
+        st.metric("총 누적 관객수", f"{filtered_df['total_audi'].sum():,} 명")
+    with col3:
+        st.metric("평균 개봉일 스크린수", f"{int(filtered_df['first_scrn'].mean()):,} 개")
+    with col4:
+        st.metric("평균 Top10 유지일수", f"{filtered_df['days_in_top10'].mean():.1f} 일")
+
+    st.divider()
 
     st.header("1. 장르별 영화 편수 분포")
     
@@ -143,7 +156,6 @@ try:
 
     st.header("5. 주요 장르별 총 관객수 분포 (박스 플롯)")
     
-    # 영화가 10편 이상인 장르 추출
     genre_counts_series = filtered_df['genre_clean'].value_counts()
     major_genres = genre_counts_series[genre_counts_series >= 10].index.tolist()
     
@@ -156,7 +168,7 @@ try:
             y='total_audi',
             color='genre_clean',
             hover_name='movieNm',
-            points="outliers",  # 이상치(outlier) 점 표출
+            points="outliers",
             title="주요 장르(10편 이상)별 총 관객수 분포 및 흥행 이상치(Outlier)",
             labels={
                 'genre_clean': '장르',
@@ -174,6 +186,38 @@ try:
         st.info("💡 **이 그래프로 알 수 있는 것:** 데이터 수가 충분한 주요 장르(10편 이상) 내에서 평균적인 흥행 규모(중앙값)와 함께, 통계적 상범주를 벗어나 대풍년을 기록한 '초대형 흥행 영화(아웃라이어)'들을 한눈에 식별할 수 있습니다.")
     else:
         st.warning("선택한 필터 조건 내에 10편 이상의 영화를 가진 장르가 없습니다.")
+
+    st.divider()
+
+    st.header("6. 스크린수, 첫 주 관객수, 최종 관객수의 다차원 버블 관계")
+    
+    fig_bubble = px.scatter(
+        filtered_df,
+        x='first_scrn',
+        y='total_audi',
+        size='first_week_audi',
+        color='genre_clean',
+        hover_name='movieNm',
+        size_max=45,
+        title="개봉일 스크린수 vs 총 관객수 (버블 크기: 개봉 첫 주 관객수)",
+        labels={
+            'first_scrn': '개봉일 스크린수',
+            'total_audi': '최종 총 관객수',
+            'first_week_audi': '개봉 첫 주 관객수',
+            'genre_clean': '장르'
+        },
+        hover_data={
+            'first_scrn': ':,.0f',
+            'total_audi': ':,.0f',
+            'first_week_audi': ':,.0f',
+            'genre_clean': True
+        }
+    )
+    fig_bubble.update_traces(marker=dict(opacity=0.7, line=dict(width=1, color='DarkSlateGrey')))
+    fig_bubble.update_layout(margin=dict(t=50, l=20, r=20, b=20))
+    
+    st.plotly_chart(fig_bubble, use_container_width=True)
+    st.info("💡 **이 그래프로 알 수 있는 것:** 개봉일 스크린수와 최종 관객수의 관계뿐만 아니라, 원의 크기를 통해 개봉 첫 주 초반 화력(첫 주 관객수)이 최종 흥행 규모 및 스크린 효율성에 미친 종합적인 영향을 한눈에 파악할 수 있습니다.")
 
     st.divider()
 
