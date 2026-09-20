@@ -8,10 +8,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# App Title and Description
 st.title("🎬 영화 데이터 그래프 도감 2 - 분포와 관계")
 st.markdown("""
-박스오피스 상위권 영화 데이터를 바탕으로 **장르별 분포**, **총 관객수 비중 및 관계**, **흥행 지표 간의 상관관계**를 다양한 시각화 차트로 살펴보는 도감입니다.
+박스오피스 상위권 영화 데이터를 바탕으로 **장르별 분포**, **총 관객수 비중 및 관계**, **개봉일 스크린수와 관객수의 상관관계**를 시각화 차트로 살펴보는 도감입니다.
 """)
 
 st.divider()
@@ -32,7 +31,6 @@ def load_data():
 try:
     df = load_data()
     
-    # Sidebar Filter Options
     st.sidebar.header("🔍 데이터 필터링")
     selected_genres = st.sidebar.multiselect(
         "장르 선택",
@@ -72,7 +70,6 @@ try:
 
     st.header("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
     
-    # 계층구조(장르 -> 영화명) 트리맵 작성
     fig_treemap = px.treemap(
         filtered_df,
         path=[px.Constant("전체 영화"), 'genre_clean', 'movieNm'],
@@ -82,7 +79,6 @@ try:
         color_discrete_sequence=px.colors.qualitative.Set3
     )
     
-    # 호버 툴팁 설정: 영화명 및 총 관객수 명시
     fig_treemap.update_traces(
         hovertemplate='<b>%{label}</b><br>총 관객수: %{value:,.0f}명<br>비율: %{percentParent:.1%}',
         textinfo='label+value'
@@ -94,52 +90,59 @@ try:
 
     st.divider()
 
-    st.header("3. 개봉 첫 주 관객수와 총 관객수의 관계")
+    st.header("3. 장르별 톱10 유지 기간 분포 (박스 플롯)")
     
-    fig_scatter = px.scatter(
+    fig_box = px.box(
         filtered_df,
-        x='first_week_audi',
-        y='total_audi',
-        size='first_scrn',
+        x='genre_clean',
+        y='days_in_top10',
         color='genre_clean',
         hover_name='movieNm',
-        title="개봉 첫 주 관객수 vs 총 관객수 (점 크기: 개봉일 스크린수)",
+        points="all",
+        title="장르별 10위권 머문 날수 분포",
         labels={
-            'first_week_audi': '개봉 첫 주 관객수',
-            'total_audi': '총 관객수',
-            'first_scrn': '개봉일 스크린수',
-            'genre_clean': '장르'
+            'genre_clean': '장르',
+            'days_in_top10': '10위권 머문 날수 (일)'
         },
-        trendline="ols"
+        color_discrete_sequence=px.colors.qualitative.Plotly
     )
-    st.plotly_chart(fig_scatter, use_container_width=True)
-    st.info("💡 **이 그래프로 알 수 있는 것:** 개봉 첫 주 관객수와 최종 총 관객수 간에는 매우 강한 양의 선형 관계가 존재하며, 초반 흥행 성공이 최종 성패를 크게 좌우합니다.")
+    fig_box.update_layout(showlegend=False, margin=dict(t=50, l=20, r=20, b=20))
+    
+    st.plotly_chart(fig_box, use_container_width=True)
+    st.info("💡 **이 그래프로 알 수 있는 것:** 장르에 따라 박스오피스 상위권(Top 10)에 장기 집권하는 지속력의 차이와 개별 영화의 스펙트럼(최솟값, 중앙값, 아웃라이어)을 한눈에 비교할 수 있습니다.")
 
     st.divider()
 
-    st.header("4. 톱10 유지 기간과 총 관객수의 관계")
+    st.header("4. 개봉일 스크린수와 총 관객수의 관계")
     
-    fig_days = px.scatter(
+    fig_scatter = px.scatter(
         filtered_df,
-        x='days_in_top10',
+        x='first_scrn',
         y='total_audi',
-        color='first_show',
+        color='genre_clean',
         hover_name='movieNm',
-        title="10위권 머문 날수 vs 총 관객수 (색상: 개봉일 상영횟수)",
+        title="개봉일 스크린수 vs 총 관객수 (색상: 장르)",
         labels={
-            'days_in_top10': '10위권 머문 날수 (일)',
+            'first_scrn': '개봉일 스크린수',
             'total_audi': '총 관객수',
-            'first_show': '개봉일 상영횟수'
+            'genre_clean': '장르'
         },
-        color_continuous_scale='Viridis'
+        hover_data={
+            'first_scrn': ':,.0f',
+            'total_audi': ':,.0f',
+            'genre_clean': True
+        }
     )
-    st.plotly_chart(fig_days, use_container_width=True)
-    st.info("💡 **이 그래프로 알 수 있는 것:** 박스오피스 상위권(Top 10)에 오래 머물수록 총 관객수가 비례하여 증가하며, 초기 상영 횟수가 많았던 영화들이 더 길게 상위권을 유지하는 경향을 보입니다.")
+    fig_scatter.update_traces(marker=dict(size=9, opacity=0.8))
+    fig_scatter.update_layout(margin=dict(t=50, l=20, r=20, b=20))
+    
+    st.plotly_chart(fig_scatter, use_container_width=True)
+    st.info("💡 **이 그래프로 알 수 있는 것:** 개봉 당일 확보한 스크린수가 많을수록 최종 총 관객수가 높아지는 경향이 있는지 확인하고, 동일한 스크린수 대비 높은 흥행을 거둔 장르 및 개별 성과 영화를 탐색할 수 있습니다.")
 
     st.divider()
 
     with st.expander("📄 원본 데이터 일부 보기"):
-        st.dataframe(filtered_df[['movieNm', 'genre_clean', 'openDt', 'first_scrn', 'first_week_audi', 'total_audi', 'days_in_top10']])
+        st.dataframe(filtered_df[['movieNm', 'genre_clean', 'openDt', 'first_scrn', 'first_show', 'first_week_audi', 'total_audi', 'days_in_top10']])
 
 except Exception as e:
     st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
