@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 
 st.set_page_config(
     page_title="영화 데이터 그래프 도감 2 - 분포와 관계",
@@ -12,7 +11,7 @@ st.set_page_config(
 # App Title and Description
 st.title("🎬 영화 데이터 그래프 도감 2 - 분포와 관계")
 st.markdown("""
-박스오피스 상위권 영화 데이터를 바탕으로 **장르별 분포**, **관객수 변수 간의 관계**, **스크린 및 흥행 지표 간의 상관관계**를 다양하게 시각화하여 살펴보는 도감입니다.
+박스오피스 상위권 영화 데이터를 바탕으로 **장르별 분포**, **총 관객수 비중 및 관계**, **흥행 지표 간의 상관관계**를 다양한 시각화 차트로 살펴보는 도감입니다.
 """)
 
 st.divider()
@@ -59,7 +58,6 @@ try:
         color_discrete_sequence=px.colors.qualitative.Pastel
     )
     
-    # 마우스 호버 시 편수와 비율이 명확하게 나타나도록 설정
     fig_donut.update_traces(
         hoverinfo='label+value+percent',
         textinfo='label+percent',
@@ -68,41 +66,31 @@ try:
     fig_donut.update_layout(margin=dict(t=50, b=20, l=20, r=20))
     
     st.plotly_chart(fig_donut, use_container_width=True)
-    
-    # 그래프 분석 자릿수 구역
-    st.info("💡 **이 그래프로 알 수 있는 것:** 특정 주요 장르(예: 드라마다, 액션 등)가 전체 상위권 영화 중 대다수의 비중을 차지하는 편중 현상을 한눈에 파악할 수 있습니다.")
+    st.info("💡 **이 그래프로 알 수 있는 것:** 특정 주요 장르(예: 드라마, 액션 등)가 전체 상위권 영화 중 대다수의 비중을 차지하는 편중 현상을 한눈에 파악할 수 있습니다.")
 
     st.divider()
 
-    st.header("2. 총 관객수 및 흥행 지표 분포")
+    st.header("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
     
-    col1, col2 = st.columns(2)
+    # 계층구조(장르 -> 영화명) 트리맵 작성
+    fig_treemap = px.treemap(
+        filtered_df,
+        path=[px.Constant("전체 영화"), 'genre_clean', 'movieNm'],
+        values='total_audi',
+        color='genre_clean',
+        title="장르 및 영화별 총 관객수 (칸 크기: 총 관객수)",
+        color_discrete_sequence=px.colors.qualitative.Set3
+    )
     
-    with col1:
-        fig_hist = px.histogram(
-            filtered_df,
-            x='total_audi',
-            nbins=30,
-            title="총 관객수 분포 (히스토그램)",
-            labels={'total_audi': '총 관객수 (명)'},
-            color_discrete_sequence=['#4C72B0']
-        )
-        fig_hist.update_layout(yaxis_title="영화 수")
-        st.plotly_chart(fig_hist, use_container_width=True)
-        
-    with col2:
-        fig_box = px.box(
-            filtered_df,
-            x='genre_clean',
-            y='total_audi',
-            title="장르별 총 관객수 분포 (박스플롯)",
-            labels={'genre_clean': '장르', 'total_audi': '총 관객수 (명)'},
-            color='genre_clean'
-        )
-        fig_box.update_layout(showlegend=False, xaxis_title="장르")
-        st.plotly_chart(fig_box, use_container_width=True)
-
-    st.info("💡 **이 그래프로 알 수 있는 것:** 대다수 영화의 관객수는 하위 구간에 모여 있으며, 일부 대형 아웃라이어(천만 관객 영화 등)가 전체 평균을 이끄는 오른쪽 꼬리가 긴 분포 형태를 띱니다.")
+    # 호버 툴팁 설정: 영화명 및 총 관객수 명시
+    fig_treemap.update_traces(
+        hovertemplate='<b>%{label}</b><br>총 관객수: %{value:,.0f}명<br>비율: %{percentParent:.1%}',
+        textinfo='label+value'
+    )
+    fig_treemap.update_layout(margin=dict(t=50, l=10, r=10, b=10))
+    
+    st.plotly_chart(fig_treemap, use_container_width=True)
+    st.info("💡 **이 그래프로 알 수 있는 것:** 각 장르가 차지하는 전체 관객 비중과 해당 장르 내에서 흥행을 견인한 대표 영화들의 관객수 규모를 한눈에 직관적으로 비교할 수 있습니다.")
 
     st.divider()
 
@@ -122,10 +110,9 @@ try:
             'first_scrn': '개봉일 스크린수',
             'genre_clean': '장르'
         },
-        trendline="ols"  # 선형 회귀 추세선
+        trendline="ols"
     )
     st.plotly_chart(fig_scatter, use_container_width=True)
-
     st.info("💡 **이 그래프로 알 수 있는 것:** 개봉 첫 주 관객수와 최종 총 관객수 간에는 매우 강한 양의 선형 관계가 존재하며, 초반 흥행 성공이 최종 성패를 크게 좌우합니다.")
 
     st.divider()
@@ -147,7 +134,6 @@ try:
         color_continuous_scale='Viridis'
     )
     st.plotly_chart(fig_days, use_container_width=True)
-
     st.info("💡 **이 그래프로 알 수 있는 것:** 박스오피스 상위권(Top 10)에 오래 머물수록 총 관객수가 비례하여 증가하며, 초기 상영 횟수가 많았던 영화들이 더 길게 상위권을 유지하는 경향을 보입니다.")
 
     st.divider()
