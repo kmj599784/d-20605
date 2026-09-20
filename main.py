@@ -10,7 +10,7 @@ st.set_page_config(
 
 st.title("🎬 영화 데이터 그래프 도감 2 - 분포와 관계")
 st.markdown("""
-박스오피스 상위권 영화 데이터를 바탕으로 **장르별 분포**, **총 관객수 비중 및 관계**, **개봉일 스크린수, 첫 주 관객수와 최종 관객수의 상관관계**를 살펴보는 시각화 도감입니다.
+박스오피스 상위권 영화 데이터를 바탕으로 **장르별 분포**, **제작국가별 구도**, **총 관객수 비중 및 관계**, **개봉일 스크린수, 첫 주 관객수와 최종 관객수의 상관관계**를 살펴보는 종합 시각화 도감입니다.
 """)
 
 st.divider()
@@ -22,6 +22,9 @@ def load_data():
     
     # genre 열 처리: 세로막대 '|' 기호로 연결되어 있는 경우 첫 번째 장르만 사용
     df['genre_clean'] = df['genre'].fillna('기타').astype(str).apply(lambda x: x.split('|')[0].strip())
+    
+    # nation 열 결측치 처리
+    df['nation_clean'] = df['nation'].fillna('기타').astype(str).apply(lambda x: x.strip())
     
     # openDt 날짜형 변환
     df['openDt_parsed'] = pd.to_datetime(df['openDt'].astype(str), format='%Y%m%d', errors='coerce')
@@ -55,7 +58,7 @@ try:
 
     st.divider()
 
-    st.header("1. 장르별 영화 편수 분포")
+    st.header("1. 장르별 영화 편수 분포 (도넛 차트)")
     
     genre_counts = filtered_df['genre_clean'].value_counts().reset_index()
     genre_counts.columns = ['장르', '영화편수']
@@ -65,14 +68,14 @@ try:
         values='영화편수',
         names='장르',
         hole=0.4,
-        title="장르별 영화 편수 비율 (도넛 차트)",
+        title="장르별 영화 편수 비율",
         color_discrete_sequence=px.colors.qualitative.Pastel
     )
     
     fig_donut.update_traces(
         hoverinfo='label+value+percent',
         textinfo='label+percent',
-        hovertemplate='<b>장르:</b> %{label}<br><b>편수:</b> %{value}편<br><b>비율:</b> %{percent}'
+        hovertemplate='<b>장르:</b> %{label}<br><b>영화편수:</b> %{value:,}편<br><b>비율:</b> %{percent}'
     )
     fig_donut.update_layout(margin=dict(t=50, b=20, l=20, r=20))
     
@@ -93,7 +96,7 @@ try:
     )
     
     fig_treemap.update_traces(
-        hovertemplate='<b>%{label}</b><br>총 관객수: %{value:,.0f}명<br>비율: %{percentParent:.1%}',
+        hovertemplate='<b>%{label}</b><br>총 관객수: %{value:,.0f}명<br>상위 대비 비율: %{percentParent:.1%}',
         textinfo='label+value'
     )
     fig_treemap.update_layout(margin=dict(t=50, l=10, r=10, b=10))
@@ -118,6 +121,9 @@ try:
             'days_in_top10': '10위권 머문 날수 (일)'
         },
         color_discrete_sequence=px.colors.qualitative.Plotly
+    )
+    fig_box.update_traces(
+        hovertemplate='<b>%{hovertext}</b><br>장르: %{x}<br>10위권 머문 날수: %{y}일'
     )
     fig_box.update_layout(showlegend=False, margin=dict(t=50, l=20, r=20, b=20))
     
@@ -146,7 +152,10 @@ try:
             'genre_clean': True
         }
     )
-    fig_scatter.update_traces(marker=dict(size=9, opacity=0.8))
+    fig_scatter.update_traces(
+        marker=dict(size=9, opacity=0.8),
+        hovertemplate='<b>%{hovertext}</b><br>장르: %{customdata[2]}<br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명'
+    )
     fig_scatter.update_layout(margin=dict(t=50, l=20, r=20, b=20))
     
     st.plotly_chart(fig_scatter, use_container_width=True)
@@ -179,6 +188,9 @@ try:
                 'total_audi': ':,.0f'
             },
             color_discrete_sequence=px.colors.qualitative.Dark24
+        )
+        fig_box_audi.update_traces(
+            hovertemplate='<b>%{hovertext}</b><br>장르: %{x}<br>총 관객수: %{y:,.0f}명'
         )
         fig_box_audi.update_layout(showlegend=False, margin=dict(t=50, l=20, r=20, b=20))
         
@@ -213,7 +225,10 @@ try:
             'genre_clean': True
         }
     )
-    fig_bubble.update_traces(marker=dict(opacity=0.7, line=dict(width=1, color='DarkSlateGrey')))
+    fig_bubble.update_traces(
+        marker=dict(opacity=0.7, line=dict(width=1, color='DarkSlateGrey')),
+        hovertemplate='<b>%{hovertext}</b><br>장르: %{customdata[3]}<br>개봉일 스크린수: %{x:,.0f}개<br>개봉 첫 주 관객수: %{customdata[2]:,.0f}명<br>최종 총 관객수: %{y:,.0f}명'
+    )
     fig_bubble.update_layout(margin=dict(t=50, l=20, r=20, b=20))
     
     st.plotly_chart(fig_bubble, use_container_width=True)
@@ -221,8 +236,33 @@ try:
 
     st.divider()
 
+    st.header("7. 제작 국가 및 장르별 영화 편수 계층 구조 (선버스트)")
+    
+    # 국가별, 장르별 영화 편수 데이터 집계
+    sunburst_df = filtered_df.groupby(['nation_clean', 'genre_clean']).size().reset_index(name='movie_count')
+    
+    fig_sunburst = px.sunburst(
+        sunburst_df,
+        path=['nation_clean', 'genre_clean'],
+        values='movie_count',
+        color='nation_clean',
+        title="제작 국가 → 장르 계층별 영화 편수 (칸 크기: 영화 편수)",
+        color_discrete_sequence=px.colors.qualitative.Pastel1
+    )
+    
+    fig_sunburst.update_traces(
+        hovertemplate='<b>%{label}</b><br>영화 편수: %{value:,}편<br>상위 영역 대비 비율: %{percentParent:.1%}<br>전체 대비 비율: %{percentRoot:.1%}',
+        textinfo='label+value'
+    )
+    fig_sunburst.update_layout(margin=dict(t=50, l=10, r=10, b=10))
+    
+    st.plotly_chart(fig_sunburst, use_container_width=True)
+    st.info("💡 **이 그래프로 알 수 있는 것:** 주요 영화 제작 국가(예: 한국, 미국 등)별로 어떤 장르의 영화가 주류를 이루고 있는지 국가별 장르 다양성과 편수 비중의 계층적 구조를 한눈에 확인할 수 있습니다.")
+
+    st.divider()
+
     with st.expander("📄 원본 데이터 일부 보기"):
-        st.dataframe(filtered_df[['movieNm', 'genre_clean', 'openDt', 'first_scrn', 'first_show', 'first_week_audi', 'total_audi', 'days_in_top10']])
+        st.dataframe(filtered_df[['movieNm', 'nation_clean', 'genre_clean', 'openDt', 'first_scrn', 'first_show', 'first_week_audi', 'total_audi', 'days_in_top10']])
 
 except Exception as e:
     st.error(f"데이터를 불러오는 중 오류가 발생했습니다: {e}")
