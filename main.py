@@ -58,6 +58,7 @@ try:
 
     st.divider()
 
+    # 1. 도넛 차트
     st.header("1. 장르별 영화 편수 분포 (도넛 차트)")
     
     genre_counts = filtered_df['genre_clean'].value_counts().reset_index()
@@ -84,6 +85,7 @@ try:
 
     st.divider()
 
+    # 2. 트리맵
     st.header("2. 장르 및 영화별 총 관객수 분포 (트리맵)")
     
     fig_treemap = px.treemap(
@@ -106,6 +108,7 @@ try:
 
     st.divider()
 
+    # 3. 박스 플롯 (Top 10 유지일수)
     st.header("3. 장르별 톱10 유지 기간 분포 (박스 플롯)")
     
     fig_box = px.box(
@@ -132,6 +135,7 @@ try:
 
     st.divider()
 
+    # 4. 산점도 (스크린수 vs 총 관객수)
     st.header("4. 개봉일 스크린수와 총 관객수의 관계")
     
     fig_scatter = px.scatter(
@@ -163,6 +167,7 @@ try:
 
     st.divider()
 
+    # 5. 주요 장르별 관객수 박스 플롯
     st.header("5. 주요 장르별 총 관객수 분포 (박스 플롯)")
     
     genre_counts_series = filtered_df['genre_clean'].value_counts()
@@ -201,6 +206,7 @@ try:
 
     st.divider()
 
+    # 6. 버블 차트
     st.header("6. 스크린수, 첫 주 관객수, 최종 관객수의 다차원 버블 관계")
     
     fig_bubble = px.scatter(
@@ -236,9 +242,9 @@ try:
 
     st.divider()
 
+    # 7. 선버스트 차트
     st.header("7. 제작 국가 및 장르별 영화 편수 계층 구조 (선버스트)")
     
-    # 국가별, 장르별 영화 편수 데이터 집계
     sunburst_df = filtered_df.groupby(['nation_clean', 'genre_clean']).size().reset_index(name='movie_count')
     
     fig_sunburst = px.sunburst(
@@ -258,6 +264,43 @@ try:
     
     st.plotly_chart(fig_sunburst, use_container_width=True)
     st.info("💡 **이 그래프로 알 수 있는 것:** 주요 영화 제작 국가(예: 한국, 미국 등)별로 어떤 장르의 영화가 주류를 이루고 있는지 국가별 장르 다양성과 편수 비중의 계층적 구조를 한눈에 확인할 수 있습니다.")
+
+    st.divider()
+
+    # 8. 한국 vs 해외 영화 비교 산점도
+    st.header("8. 한국 영화와 해외 영화 간의 개봉일 평균 스크린수와 평균 총 관객수에는 어떤 차이가 있나요?")
+    
+    fig_nation_scatter = px.scatter(
+        filtered_df,
+        x='days_in_top10',
+        y='total_audi',
+        color='nation_clean',
+        size='first_scrn',
+        hover_name='movieNm',
+        size_max=35,
+        title="한국 영화와 해외 영화 간의 개봉일 평균 스크린수와 평균 총 관객수에는 어떤 차이가 있나요?",
+        labels={
+            'days_in_top10': '10위권에 머문 날수',
+            'total_audi': '총 관객수',
+            'nation_clean': '제작 국가',
+            'first_scrn': '개봉일 스크린수'
+        },
+        hover_data={
+            'days_in_top10': True,
+            'total_audi': ':,.0f',
+            'first_scrn': ':,.0f',
+            'nation_clean': True
+        }
+    )
+    
+    fig_nation_scatter.update_traces(
+        marker=dict(opacity=0.75, line=dict(width=1, color='DarkSlateGrey')),
+        hovertemplate='<b>%{hovertext}</b><br>제작국가: %{customdata[3]}<br>10위권 머문 날수: %{x}일<br>개봉일 스크린수: %{customdata[2]:,.0f}개<br>총 관객수: %{y:,.0f}명'
+    )
+    fig_nation_scatter.update_layout(margin=dict(t=50, l=20, r=20, b=20))
+    
+    st.plotly_chart(fig_nation_scatter, use_container_width=True)
+    st.info("💡 **이 그래프로 알 수 있는 것:** 한국 영화와 해외 영화 간에 개봉일 스크린수(점 크기) 확보 규모 차이, Top 10 체류 일수(X축) 및 최종 총 관객수(Y축)에 따른 유통·흥행 구조의 차이를 한눈에 파악할 수 있습니다.")
 
     st.divider()
 
